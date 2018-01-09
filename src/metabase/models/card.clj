@@ -109,14 +109,45 @@
    READ-OR-WRITE is `:write`)."
   (memoize/ttl query-perms-set* :ttl/threshold (* 6 60 60 1000))) ; memoize for 6 hours
 
+(defn with-in-public-dashboard
+  "Efficiently add a `:in_public_dashboard` key to each item in a sequence of `cards`. This boolean key predictably
+  represents whether the Card in question is a member of one or more public Dashboards, which can be important in
+  determining its permissions."
+  {:batched-hydrate :in_public_dashboard}
+  [cards]
+  (let [card-ids                  (set (filter some? (map :id cards)))
+        public-dashboard-card-ids (when (seq card-ids)
+                                    (->> (db/query {:select    [[:c.id :id]]
+                                                    :from      [[:report_card :c]]
+                                                    :left-join [[:report_dashboardcard :dc] [:= :c.id :dc.card_id]
+                                                                [:report_dashboard :d] [:= :dc.dashboard_id :d.id]]
+                                                    :where     [:and
+                                                                [:in :c.id card-ids]
+                                                                [:not= :d.public_uuid nil]]})
+                                         (map :id)
+                                         set))]
+    (for [card cards]
+      (assoc card :in_public_dashboard (contains? public-dashboard-card-ids (u/get-id card))))))
 
 (defn- perms-objects-set
   "Return a set of required permissions object paths for CARD.
    Optionally specify whether you want `:read` or `:write` permissions; default is `:read`.
    (`:write` permissions only affects native queries)."
-  [{query :dataset_query, collection-id :collection_id} read-or-write]
-  (if collection-id
+  [{query           :dataset_query
+    collection-id   :collection_id
+    public-uuid     :public_uuid
+    in-public-dash? :in_public_dashboard}
+   read-or-write]
+  (cond
+    ;; you don't need any permissions to READ a public card, which is PUBLIC by definition :D
+    (and (= :read read-or-write)
+         (or public-uuid in-public-dash?))
+    #{}
+
+    collection-id
     (collection/perms-objects-set collection-id read-or-write)
+
+    :else
     (query-perms-set query read-or-write)))
 
 

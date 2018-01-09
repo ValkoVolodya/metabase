@@ -598,7 +598,7 @@
               :or   {constraints dataset-api/default-query-constraints
                      context     :question}}]
   {:pre [(u/maybe? sequential? parameters)]}
-  (let [card    (api/read-check Card card-id)
+  (let [card    (api/read-check (hydrate (Card card-id) :in_public_dashboard))
         query   (query-for-card card parameters constraints)
         options {:executed-by  api/*current-user-id*
                  :context      context

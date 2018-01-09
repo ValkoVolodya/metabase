@@ -82,7 +82,7 @@
 
 (defn- hide-unreadable-cards
   "Replace the `:card` and `:series` entries from dashcards that they user isn't allowed to read with empty objects."
-  [dashboard]
+  [{public-uuid :public_uuid, :as dashboard}]
   (update dashboard :ordered_cards (fn [dashcards]
                                      (vec (for [dashcard dashcards]
                                             (-> dashcard
@@ -181,7 +181,7 @@
   "Get `Dashboard` with ID."
   [id]
   (u/prog1 (-> (Dashboard id)
-               (hydrate :creator [:ordered_cards [:card :creator] :series])
+               (hydrate [:ordered_cards [:card :in_public_dashboard] :series])
                api/read-check
                api/check-not-archived
                hide-unreadable-cards

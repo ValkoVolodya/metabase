@@ -28,13 +28,17 @@
           card     (cons (:card dashcard) (:series dashcard))]
       card)))
 
-(defn- can-read? [dashboard]
-  ;; if Dashboard is already hydrated no need to do it a second time
-  (let [cards (or (dashcards->cards (:ordered_cards dashboard))
-                  (dashcards->cards (-> (db/select [DashboardCard :id :card_id], :dashboard_id (u/get-id dashboard))
-                                        (hydrate :card :series))))]
-    (or (empty? cards)
-        (some i/can-read? cards))))
+(defn- can-read? [{public-uuid :public_uuid, :as dashboard}]
+  (or
+   ;; if the Dashboard is shared publically then there is simply no need to check permissions for it because people
+   ;; can see it already!!!
+   (some? public-uuid)
+   ;; if Dashboard is already hydrated no need to do it a second time
+   (let [cards (or (dashcards->cards (:ordered_cards dashboard))
+                   (dashcards->cards (-> (db/select [DashboardCard :id :card_id], :dashboard_id (u/get-id dashboard))
+                                         (hydrate :card :series))))]
+     (or (empty? cards)
+         (some i/can-read? cards)))))
 
 
 ;;; --------------------------------------------------- Hydration ----------------------------------------------------
